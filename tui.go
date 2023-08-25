@@ -4,45 +4,48 @@ import (
 	"bufio"
 	"fmt"
 	"io"
+	"os"
 	"strconv"
 	"strings"
 
-	"github.com/mdwhatcott/tui/internal/just"
+	"github.com/mdwhatcott/tui/v2/internal/just"
 )
 
 type TUI struct {
-	stdin  *bufio.Scanner
-	stdout io.Writer
+	io.Reader
+	io.Writer
 }
 
-func New(stdin io.Reader, stdout io.Writer) *TUI {
+func New() *TUI {
 	return &TUI{
-		stdin:  bufio.NewScanner(stdin),
-		stdout: stdout,
+		Reader: os.Stdin,
+		Writer: os.Stderr,
 	}
 }
-func (this *TUI) Print(args ...any)                 { _, _ = fmt.Fprint(this.stdout, args...) }
-func (this *TUI) Printf(format string, args ...any) { _, _ = fmt.Fprintf(this.stdout, format, args...) }
-func (this *TUI) Println(args ...any)               { _, _ = fmt.Fprintln(this.stdout, args...) }
+
+func (this *TUI) Print(args ...any)                 { _, _ = fmt.Fprint(this.Writer, args...) }
+func (this *TUI) Printf(format string, args ...any) { _, _ = fmt.Fprintf(this.Writer, format, args...) }
+func (this *TUI) Println(args ...any)               { _, _ = fmt.Fprintln(this.Writer, args...) }
 
 // Confirm displays a default selection but allows the user to overwrite it.
 func (this *TUI) Confirm(label, value string) string {
-	prompt := fmt.Sprintf("%s: [%s] <ENTER> to continue or type another value here: ", label, value)
+	prompt := fmt.Sprintf("%s: [%s] Press <ENTER> or type another %s: ", label, value, label)
 	return just.Coalesce(this.Prompt(prompt), value)
 }
 
 // Prompt returns one line of text submitted via stdin.
 func (this *TUI) Prompt(message string) string {
 	this.Print(message)
-	_ = this.stdin.Scan()
-	return this.stdin.Text()
+	return line(bufio.NewScanner(this.Reader))
 }
 
 // MultilinePrompt returns newline-separated, trimmed text from stdin until 3+ blank lines are submitted.
 func (this *TUI) MultilinePrompt(intro string) string {
-	blanks := 0
+	this.Println(intro + multilinePrompt)
 	var result strings.Builder
-	for text := this.Prompt(intro + multilinePrompt); blanks < 3; text = this.Prompt("") {
+	scanner := bufio.NewScanner(this.Reader)
+	for blanks := 0; blanks < 3; {
+		text := line(scanner)
 		if text == "" {
 			blanks++
 		} else {
@@ -53,26 +56,45 @@ func (this *TUI) MultilinePrompt(intro string) string {
 	return strings.TrimSpace(result.String())
 }
 
-// Yes returns whether the user indicates a 'yes' answer.
-func (this *TUI) Yes(question string, defaultYes bool) bool {
-	defaults := "[Y/n]"
-	if !defaultYes {
-		defaults = "[y/N]"
-	}
-	answer := strings.ToLower(this.Prompt(fmt.Sprintf("%s %s ", question, defaults)))
-	return answer == "y" || answer == "" && defaultYes
+// YesNo returns whether the user indicates a 'yes' answer (and 'yes' is default).
+func (this *TUI) YesNo(question string) bool {
+	return strings.ToLower(this.Prompt(fmt.Sprintf("%s [Y/n] ", question))) != "n"
 }
 
-// Select displays a set of numbered options for the user to choose from.
+// NoYes returns whether the user indicates a 'yes' answer (but 'no' is default).
+func (this *TUI) NoYes(question string) bool {
+	return strings.ToLower(this.Prompt(fmt.Sprintf("%s [y/N] ", question))) == "y"
+}
+
+// Select displays a set of numbered options and allows the user to choose one of them.
 func (this *TUI) Select(label string, options ...string) string {
-	if len(options) == 0 {
-		return this.Confirm(label, "")
-	}
-	if len(options) == 1 {
-		return this.Confirm(label, options[0])
+	if len(options) <= 1 {
+		panic("not enough options provided")
 	}
 	for {
-		this.Printf("Choose the %s:\n", label)
+		this.Printf("Choose %s:\n", label)
+		for n, option := range options {
+			this.Printf("%d. %s\n", n+1, option)
+		}
+		choice := just.Value(strconv.Atoi(this.Prompt("Enter the number of your choice: "))) - 1
+		if choice < 0 || choice >= len(options) {
+			this.Println("Invalid choice, try again.")
+			continue
+		}
+		return options[choice]
+	}
+}
+
+// Suggest is like Select but allows the user to input something other than what is presented.
+func (this *TUI) Suggest(label string, options ...string) string {
+	if len(options) == 0 {
+		return this.Prompt(fmt.Sprintf("Enter the %s: ", label))
+	}
+	if len(options) == 1 {
+		return options[0]
+	}
+	for {
+		this.Printf("Choose %s:\n", label)
 		for n, option := range options {
 			this.Printf("%d. %s\n", n+1, option)
 		}
@@ -84,10 +106,40 @@ func (this *TUI) Select(label string, options ...string) string {
 			continue
 		}
 		if choice == len(options) {
-			return this.Confirm(label, "")
+			return this.Prompt(fmt.Sprintf("Enter %s: ", label))
 		}
 		return options[choice]
 	}
 }
 
-const multilinePrompt = " (type or paste multiline text below; 3+ consecutive blank lines signals EOF)\n"
+// SelectMany displays a set of numbered options and allows the user to choose zero or more of them.
+func (this *TUI) SelectMany(label string, options ...string) (results []string) {
+	if len(options) <= 1 {
+		panic("not enough options provided to allow a choice")
+	}
+	for {
+		this.Printf("Choose one or more of %s:\n", label)
+		for n, option := range options {
+			this.Printf("%d. %s\n", n+1, option)
+		}
+		choices := strings.Fields(this.Prompt("Enter the numbers of your choice (separated by ' '): "))
+		for _, raw := range choices {
+			choice := just.Value(strconv.Atoi(raw)) - 1
+			if 0 <= choice && choice < len(options) {
+				results = append(results, options[choice])
+			}
+		}
+		if len(results) < len(choices) {
+			this.Println("Invalid choices, try again.")
+			continue
+		}
+		return results
+	}
+}
+
+func line(scanner *bufio.Scanner) string {
+	_ = scanner.Scan()
+	return scanner.Text()
+}
+
+const multilinePrompt = " (type or paste multiline text below; several consecutive blank lines will signal EOF)\n"
