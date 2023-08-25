@@ -71,58 +71,67 @@ func (this *TUI) Select(label string, options ...string) string {
 	if len(options) <= 1 {
 		panic("not enough options provided")
 	}
-	for {
+	scanner := bufio.NewScanner(this.Reader)
+	for x := 0; x < 100; x++ {
 		this.Printf("Choose %s:\n", label)
 		for n, option := range options {
 			this.Printf("%d. %s\n", n+1, option)
 		}
-		choice := just.Value(strconv.Atoi(this.Prompt("Enter the number of your choice: "))) - 1
+		this.Print("Enter the number of your choice: ")
+		raw := line(scanner)
+		choice := just.Value(strconv.Atoi(raw)) - 1
 		if choice < 0 || choice >= len(options) {
 			this.Println("Invalid choice, try again.")
 			continue
 		}
 		return options[choice]
 	}
+	panic("user failed to enter a valid choice")
 }
 
 // Suggest is like Select but allows the user to input something other than what is presented.
 func (this *TUI) Suggest(label string, options ...string) string {
-	if len(options) == 0 {
-		return this.Prompt(fmt.Sprintf("Enter the %s: ", label))
+	if len(options) <= 1 {
+		panic("not enough options provided")
 	}
-	if len(options) == 1 {
-		return options[0]
-	}
-	for {
+	scanner := bufio.NewScanner(this.Reader)
+	for x := 0; x < 100; x++ {
 		this.Printf("Choose %s:\n", label)
 		for n, option := range options {
 			this.Printf("%d. %s\n", n+1, option)
 		}
 		this.Printf("%d. None of the above\n", len(options)+1)
 
-		choice := just.Value(strconv.Atoi(this.Prompt("Enter the number of your choice: "))) - 1
+		this.Print("Enter the number of your choice: ")
+		raw := line(scanner)
+		choice := just.Value(strconv.Atoi(raw)) - 1
 		if choice < 0 || choice >= len(options)+1 {
 			this.Println("Invalid choice, try again.")
 			continue
 		}
 		if choice == len(options) {
-			return this.Prompt(fmt.Sprintf("Enter %s: ", label))
+			this.Printf("Enter %s: ", label)
+			return line(scanner)
 		}
 		return options[choice]
 	}
+	panic("user failed to enter a valid choice")
 }
 
 // SelectMany displays a set of numbered options and allows the user to choose zero or more of them.
 func (this *TUI) SelectMany(label string, options ...string) (results []string) {
 	if len(options) <= 1 {
-		panic("not enough options provided to allow a choice")
+		panic("not enough options provided")
 	}
-	for {
+	scanner := bufio.NewScanner(this.Reader)
+	for x := 0; x < 100; x++ {
 		this.Printf("Choose one or more of %s:\n", label)
 		for n, option := range options {
 			this.Printf("%d. %s\n", n+1, option)
 		}
-		choices := strings.Fields(this.Prompt("Enter the numbers of your choice (separated by ' '): "))
+		this.Print("Enter the numbers of your choice (separated by ' '): ")
+		raw := line(scanner)
+		choices := strings.Fields(raw)
 		for _, raw := range choices {
 			choice := just.Value(strconv.Atoi(raw)) - 1
 			if 0 <= choice && choice < len(options) {
@@ -135,6 +144,7 @@ func (this *TUI) SelectMany(label string, options ...string) (results []string) 
 		}
 		return results
 	}
+	panic("user failed to enter a valid choice")
 }
 
 func line(scanner *bufio.Scanner) string {

@@ -1,6 +1,7 @@
 package should
 
 import (
+	"errors"
 	"fmt"
 	"reflect"
 	"testing"
@@ -39,6 +40,16 @@ func BeTrue(actual any, _ ...any) error          { return Equal(actual, true) }
 func BeFalse(actual any, _ ...any) error         { return Equal(actual, false) }
 func BeNil(actual any, _ ...any) error           { return Equal(actual, nil) }
 func (negated) BeNil(actual any, _ ...any) error { return NOT.Equal(actual, nil) }
+func Panic(actual any, _ ...any) (result error) {
+	defer func() {
+		r := recover()
+		if r == nil {
+			result = errors.New("expected function to panic, but it didn't")
+		}
+	}()
+	actual.(func())()
+	return nil
+}
 
 func format(v any) string {
 	if isTime(v) {

@@ -5,71 +5,54 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/mdwhatcott/tui"
-	"github.com/mdwhatcott/tui/internal/should"
+	"github.com/mdwhatcott/tui/v2"
+	"github.com/mdwhatcott/tui/v2/internal/should"
 )
 
+func ui(input string) *tui.TUI {
+	ui := tui.New()
+	ui.Reader = strings.NewReader(input)
+	ui.Writer = io.Discard
+	return ui
+}
 func TestPrompt(t *testing.T) {
-	ui := tui.New(strings.NewReader("Hello, world!\n"), io.Discard)
-	should.So(t, ui.Prompt(""), should.Equal, "Hello, world!")
+	should.So(t, ui("Hello, world!\n").Prompt(""), should.Equal, "Hello, world!")
 }
 func TestMultilinePrompt(t *testing.T) {
-	ui := tui.New(strings.NewReader("1\n2\n3\n\n\n\n"), io.Discard)
-	should.So(t, ui.MultilinePrompt(""), should.Equal, "1\n2\n3")
+	should.So(t, ui("1\n2\n3\n\n\n\n").MultilinePrompt(""), should.Equal, "1\n2\n3")
 }
-func TestYes_NoMeansNo(t *testing.T) {
-	ui := tui.New(strings.NewReader("n"), io.Discard)
-	should.So(t, ui.Yes("", false), should.BeFalse)
+func TestNoYes(t *testing.T) {
+	should.So(t, ui("n").NoYes(""), should.BeFalse)
+	should.So(t, ui("n").NoYes(""), should.BeFalse)
+	should.So(t, ui("whatever").NoYes(""), should.BeFalse)
+	should.So(t, ui("").NoYes(""), should.BeFalse)
 }
-func TestYes_NoStillMeansNo(t *testing.T) {
-	ui := tui.New(strings.NewReader("n"), io.Discard)
-	should.So(t, ui.Yes("", true), should.BeFalse)
+func TestYesNo(t *testing.T) {
+	should.So(t, ui("").YesNo(""), should.BeTrue)
+	should.So(t, ui("y").YesNo(""), should.BeTrue)
+	should.So(t, ui("Y").YesNo(""), should.BeTrue)
 }
-func TestYes_WhateverMeansNo(t *testing.T) {
-	ui := tui.New(strings.NewReader("whatever"), io.Discard)
-	should.So(t, ui.Yes("", true), should.BeFalse)
+func TestConfirm(t *testing.T) {
+	should.So(t, ui("").Confirm("label", "default"), should.Equal, "default")
+	should.So(t, ui("override").Confirm("label", "default"), should.Equal, "override")
 }
-func TestYes_NothingMeansNo(t *testing.T) {
-	ui := tui.New(strings.NewReader(""), io.Discard)
-	should.So(t, ui.Yes("", false), should.BeFalse)
+func TestSelect(t *testing.T) {
+	should.So(t, func() { ui("").Select("-") }, should.Panic)
+	should.So(t, func() { ui("").Select("-", "only") }, should.Panic)
+	should.So(t, func() { ui(strings.Repeat("invalid\n", 100)+"1 3\n").Select("-", "A", "B", "C") }, should.Panic)
+	should.So(t, ui("2\n").Select("-", "A", "B"), should.Equal, "B")
 }
-func TestYes_NothingMeansNoUnlessYesIsDefault(t *testing.T) {
-	ui := tui.New(strings.NewReader(""), io.Discard)
-	should.So(t, ui.Yes("", true), should.BeTrue)
+func TestSuggest(t *testing.T) {
+	should.So(t, func() { ui("").Suggest("-") }, should.Panic)
+	should.So(t, func() { ui("").Suggest("-", "only") }, should.Panic)
+	should.So(t, func() { ui(strings.Repeat("invalid\n", 100)+"1 3\n").Suggest("-", "A", "B", "C") }, should.Panic)
+	should.So(t, ui("invalid\n2\n").Suggest("-", "A", "B"), should.Equal, "B")
+	should.So(t, ui("3\nC\n").Suggest("-", "A", "B"), should.Equal, "C")
 }
-func TestYes_YesMeansYes(t *testing.T) {
-	ui := tui.New(strings.NewReader("y"), io.Discard)
-	should.So(t, ui.Yes("", false), should.BeTrue)
-}
-func TestYes_YESMeansYes(t *testing.T) {
-	ui := tui.New(strings.NewReader("Y"), io.Discard)
-	should.So(t, ui.Yes("", false), should.BeTrue)
-}
-func TestConfirm_Default(t *testing.T) {
-	ui := tui.New(strings.NewReader(""), io.Discard)
-	should.So(t, ui.Confirm("label", "default"), should.Equal, "default")
-}
-func TestConfirm_Override(t *testing.T) {
-	ui := tui.New(strings.NewReader("override"), io.Discard)
-	should.So(t, ui.Confirm("label", "default"), should.Equal, "override")
-}
-func TestSelect_ZeroOptions(t *testing.T) {
-	ui := tui.New(strings.NewReader(""), io.Discard)
-	should.So(t, ui.Select("Nada"), should.Equal, "")
-}
-func TestSelect_OneOption(t *testing.T) {
-	ui := tui.New(strings.NewReader(""), io.Discard)
-	should.So(t, ui.Select("Nada", "only"), should.Equal, "only")
-}
-func TestSelect_MultipleOptions(t *testing.T) {
-	ui := tui.New(strings.NewReader("2\n"), io.Discard)
-	should.So(t, ui.Select("Nada", "first", "second"), should.Equal, "second")
-}
-func TestSelect_MultipleOptions_InvalidChoicePromptsRetry(t *testing.T) {
-	ui := tui.New(strings.NewReader("invalid\n2\n"), io.Discard)
-	should.So(t, ui.Select("Nada", "first", "second"), should.Equal, "second")
-}
-func TestSelect_CustomOption(t *testing.T) {
-	ui := tui.New(strings.NewReader("3\ncustom-option\n"), io.Discard)
-	should.So(t, ui.Select("Nada", "first", "second"), should.Equal, "custom-option")
+func TestSelectMany(t *testing.T) {
+	should.So(t, func() { ui("").SelectMany("-") }, should.Panic)
+	should.So(t, func() { ui("").SelectMany("-", "only") }, should.Panic)
+	should.So(t, func() { ui(strings.Repeat("invalid\n", 100)+"1 3\n").SelectMany("-", "A", "B", "C") }, should.Panic)
+	should.So(t, ui("invalid\n1 3\n").SelectMany("-", "A", "B", "C"), should.Equal, []string{"A", "C"})
+	should.So(t, ui("1 3\n").SelectMany("-", "A", "B", "C"), should.Equal, []string{"A", "C"})
 }
