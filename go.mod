@@ -1,3 +1,3 @@
-module github.com/mdwhatcott/tui/v2
+module github.com/mdw-go/tui/v2
 
 go 1.20

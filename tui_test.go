@@ -5,8 +5,8 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/mdwhatcott/tui/v2"
-	"github.com/mdwhatcott/tui/v2/internal/should"
+	"github.com/mdw-go/tui/v2"
+	"github.com/mdw-go/tui/v2/internal/should"
 )
 
 func ui(input string) *tui.TUI {

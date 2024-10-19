@@ -8,7 +8,7 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/mdwhatcott/tui/v2/internal/just"
+	"github.com/mdw-go/tui/v2/internal/just"
 )
 
 type TUI struct {

@@ -1,6 +1,6 @@
 package main
 
-import "github.com/mdwhatcott/tui/v2"
+import "github.com/mdw-go/tui/v2"
 
 func main() {
 	ui := tui.New()
