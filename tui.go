@@ -85,7 +85,7 @@ func (this *TUI) Select(label string, options ...string) string {
 			continue
 		}
 		selection := options[choice]
-		this.Printf("Selection: [%s]\n", selection)
+		this.Printf("Selection: '%s'\n", selection)
 		return selection
 	}
 	panic("user failed to enter a valid choice")
@@ -116,7 +116,7 @@ func (this *TUI) Suggest(label string, options ...string) string {
 			return line(scanner)
 		}
 		selection := options[choice]
-		this.Printf("Selection: [%s]\n", selection)
+		this.Printf("Selection: '%s'\n", selection)
 		return selection
 	}
 	panic("user failed to enter a valid choice")
@@ -148,7 +148,7 @@ func (this *TUI) SelectMany(label string, options ...string) (results []string) 
 		}
 		this.Println("Selections:")
 		for _, result := range results {
-			this.Println("-", result)
+			this.Printf("- '%s'\n", result)
 		}
 		return results
 	}
